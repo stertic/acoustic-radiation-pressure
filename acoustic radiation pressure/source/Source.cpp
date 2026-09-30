@@ -18,16 +18,16 @@ constexpr int transDiam = 12;
 constexpr float transNormV = 0.01f;
 
 //air temperature = 21 C
-#define airPressure 1007.383
+constexpr double airPressure = 1007.383;
 //density = kg/m3
-#define airDensity 1.193063
+constexpr double airDensity = 1.193063;
 //per mm
-#define wavenumMM 0.73273298042910629468516463749959
+constexpr double wavenumMM = 0.73273298042910629468516463749959;
 
-#define DEGTORAD 0.017453292
-#define RADTODEG 57.2957795
-#define TAU 6.2831853071795864
-#define PI 3.1415926535897932
+constexpr double DEGTORAD = 0.017453292;
+constexpr double RADTODEG = 57.2957795;
+constexpr double TAU = 6.2831853071795864;
+constexpr double PI = 3.1415926535897932;
 
 //has alpha because DIB function(setDIBtoDevice) only supports 32 bits per pixel(one byte stride)
 typedef struct {
@@ -58,40 +58,43 @@ typedef struct {
 	bool inv;
 } trans;
 
-namespace sim {
+class sim {
+private:
 	float prsrField[simGridX][simGridY] = { 0 };
 	trans* transArr;
 	unsigned int transArrLen;
-	float t;
+public:
 	bool progress;
+	float t;
+	sim();
+	void freeSim();
+	void runPrsrSim();
+	void renderPrsrField();
+	void invertTrans(unsigned int transNum);
+};
+
+sim::sim() {
+		t = 0;
+		progress = false;
+		rad theta = 0;
+		transArr = new trans[16];
+		transArrLen = 16;
+		for (int i = 0; i < 16; i++) {
+			transArr[i].posX = 75 + 55 * cos(theta);
+			transArr[i].posY = 75 + 55 * sin(theta);
+			transArr[i].rot = theta + PI / 2;
+			transArr[i].inv = false;
+			//2pi / 16
+			theta += PI / 8;
+		}
 }
 
-void initSim() {
-	using namespace sim;
-	t = 0;
-	progress = false;
-	rad theta = 0;
-	transArr = new trans[16];
-	transArrLen = 16;
-	for (int i = 0; i < 16; i++) {
-		transArr[i].posX = 75 + 55 * cos(theta);
-		transArr[i].posY = 75 + 55 * sin(theta);
-		transArr[i].rot = theta + PI / 2;
-		transArr[i].inv = false;
-		//2pi / 16
-		theta += PI / 8;
-	}
-	return;
-}
-
-void freeSim() {
-	using namespace sim;
+void sim::freeSim() {
 	delete[] transArr;
 }
 
 //sim functions should scan through simgrid x, y
-void runPrsrSim() {
-	using namespace sim;
+void sim::runPrsrSim() {
 	//pressure field coordinates = x, y
 	//surface coordinates = surfXY(determined from rovesurf)
 	float surfX, surfY, dist, tx, ty, curSol;
@@ -128,12 +131,12 @@ void runPrsrSim() {
 }
 
 //render functions should scan through main window w, h along side the simgrid to prevent invalid access
-void renderPrsrField() {
+void sim::renderPrsrField() {
 	float eval, surfX, surfY;
 	//background
 	memset(mainWindow::renderPass, 10, mainWindow::renderPassDIBINFO.bmiHeader.biSizeImage);
 	
-	RGBA pixelCol;
+	RGBA pixelCol{};
 	for (int x = 0; x * 2 < mainWindow::w && x < simGridX; x++) {
 		for (int y = 0; y * 2 < mainWindow::h && y < simGridY; y++) {
 			/*
@@ -199,6 +202,18 @@ void printField(float(*inpPtr)[simGridY]) {
 }
 */
 
+void sim::invertTrans(unsigned int transNum) {
+	if (transNum >= transArrLen) {
+		//invalid transducer selected
+		return;
+	}
+	if (sim::transArr[transNum].inv)
+		sim::transArr[transNum].inv = false;
+	else
+		sim::transArr[transNum].inv = true;
+	return;
+}
+
 namespace globals {
 	bool quit = false, runsim = true;
 	bool keyboard[256] = { 0 };
@@ -207,6 +222,8 @@ namespace globals {
 	uint8_t mouseButton;
 
 	unsigned int selected;
+
+	sim mainSim;
 }
 
 enum { MOUSEL = 0b1, MOUSER = 0b10, MOUSEM = 0b100, MOUSEX1 = 0b1000, MOUSEX2 = 0b10000 };
@@ -242,7 +259,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	QueryPerformanceFrequency(&precisionClockFreq);
 	QueryPerformanceCounter(&precisionPrevTime);
 
-	initSim();
 	globals::selected = 0;
 	ShowWindow(hwnd, nCmdShow);
 
@@ -275,8 +291,8 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 			if (globals::keyboard[VK_SHIFT]) {
 				/////////////////////
 			}
-			if (sim::progress) {
-				sim::t += dt;
+			if (globals::mainSim.progress) {
+				globals::mainSim.t += dt;
 				globals::runsim = true;
 			}
 			accum -= dt;
@@ -284,7 +300,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 		InvalidateRect(hwnd, NULL, FALSE);
 		Sleep(0);
 	}
-	freeSim();
+	globals::mainSim.freeSim();
 	return 0;
 }
 
@@ -316,12 +332,12 @@ LRESULT CALLBACK winProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 			height = clientRect.bottom - clientRect.top;
 
 		if (globals::runsim) {
-			runPrsrSim();
+			globals::mainSim.runPrsrSim();
 			globals::runsim = false;
 		}
 		//memset(mainWindow::renderPass, 10, mainWindow::renderPassDIBINFO.bmiHeader.biSizeImage);
 
-		renderPrsrField();
+		globals::mainSim.renderPrsrField();
 		SetDIBitsToDevice(bufferHDC, 0, 0, mainWindow::w, mainWindow::h, 0, 0, 0, mainWindow::h, mainWindow::renderPass, &mainWindow::renderPassDIBINFO, DIB_RGB_COLORS);
 		/*
 		for (int x = 50; x < 100; x++) {
@@ -361,14 +377,14 @@ LRESULT CALLBACK winProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 						globals::quit = true;
 						break;
 					case 'W':
-						sim::t += 0.2;
+						globals::mainSim.t += 0.2;
 						globals::runsim = true;
 						break;
 					case 'R':
-						if (sim::progress)
-							sim::progress = false;
+						if (globals::mainSim.progress)
+							globals::mainSim.progress = false;
 						else
-							sim::progress = true;
+							globals::mainSim.progress = true;
 						break;
 					case 'T':
 						globals::selected++;
@@ -376,10 +392,7 @@ LRESULT CALLBACK winProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 							globals::selected = 0;
 						break;
 					case 'G':
-						if (sim::transArr[globals::selected].inv)
-							sim::transArr[globals::selected].inv = false;
-						else
-							sim::transArr[globals::selected].inv = true;
+						globals::mainSim.invertTrans(globals::selected);
 						break;
 					}
 				}
