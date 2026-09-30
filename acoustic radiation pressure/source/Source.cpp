@@ -10,12 +10,12 @@
 
 //grid in mm
 //Hz in Hz(not kHz)
-#define simGridX 150
-#define simGridY 150
-#define transFreq 40000
-#define transRadi 6
-#define transDiam 12
-#define transNormV 0.01f
+constexpr int simGridX = 150;
+constexpr int simGridY = 150;
+constexpr int transFreq = 40000;
+constexpr int transRadi = 6;
+constexpr int transDiam = 12;
+constexpr float transNormV = 0.01f;
 
 //air temperature = 21 C
 #define airPressure 1007.383
