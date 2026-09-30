@@ -73,15 +73,13 @@ public:
 	void invertTrans(unsigned int transNum);
 };
 
-sim::sim() {
-		t = 0;
-		progress = false;
+sim::sim() : progress(false), t(0) {
 		rad theta = 0;
 		transArr = new trans[16];
 		transArrLen = 16;
 		for (int i = 0; i < 16; i++) {
-			transArr[i].posX = 75 + 55 * cos(theta);
-			transArr[i].posY = 75 + 55 * sin(theta);
+			transArr[i].posX = 75 + (unsigned int)(55.f * cos(theta));
+			transArr[i].posY = 75 + (unsigned int)(55.f * sin(theta));
 			transArr[i].rot = theta + PI / 2;
 			transArr[i].inv = false;
 			//2pi / 16
@@ -98,21 +96,22 @@ void sim::runPrsrSim() {
 	//pressure field coordinates = x, y
 	//surface coordinates = surfXY(determined from rovesurf)
 	float surfX, surfY, dist, tx, ty, curSol;
+	constexpr float waveCoefficient = (float)(transNormV * transFreq * airDensity);
 
 	memset(prsrField, 0, sizeof(prsrField));
-	for (int tarTrans = 0; tarTrans < sim::transArrLen; tarTrans++) {
+	for (unsigned int tarTrans = 0; tarTrans < sim::transArrLen; tarTrans++) {
 		for (int x = 0; x < simGridX; x++) {
 			for (int y = 0; y < simGridY; y++) {
 				curSol = 0;
 				for (int roveSurf = -transRadi; roveSurf < transRadi; roveSurf++) {
-					surfX = cos(transArr[tarTrans].rot) * roveSurf + transArr[tarTrans].posX;
-					surfY = sin(transArr[tarTrans].rot) * roveSurf + transArr[tarTrans].posY;
+					surfX = (float)(cos(transArr[tarTrans].rot) * (double)roveSurf) + (float)transArr[tarTrans].posX;
+					surfY = (float)(sin(transArr[tarTrans].rot) * (double)roveSurf) + (float)transArr[tarTrans].posY;
 					tx = surfX - x;
 					tx *= tx;
 					ty = surfY - y;
 					ty *= ty;
 					dist = std::sqrt(tx + ty);
-					curSol += sin(wavenumMM * dist) / dist;
+					curSol += (float)(sin(wavenumMM * dist) / (double)dist);
 				}
 				//i(cos(-kr) + i sin(-kr))
 				//i(cos(-kr) - i sin(kr))
@@ -120,9 +119,9 @@ void sim::runPrsrSim() {
 				//real = sin(kr)
 				//transNormV multiplied outside since assuming constant surface normal velocity
 				if(transArr[tarTrans].inv)
-					curSol *= transNormV * transFreq * airDensity * cos(t + PI);
+					curSol *= waveCoefficient * cos(t + (float)PI);
 				else
-					curSol *= transNormV * transFreq * airDensity * cos(t);
+					curSol *= waveCoefficient * cos(t);
 				prsrField[x][y] += curSol;
 			}
 		}
@@ -137,8 +136,8 @@ void sim::renderPrsrField() {
 	memset(mainWindow::renderPass, 10, mainWindow::renderPassDIBINFO.bmiHeader.biSizeImage);
 	
 	RGBA pixelCol{};
-	for (int x = 0; x * 2 < mainWindow::w && x < simGridX; x++) {
-		for (int y = 0; y * 2 < mainWindow::h && y < simGridY; y++) {
+	for (int x = 0; x * 2 < (int)mainWindow::w && x < simGridX; x++) {
+		for (int y = 0; y * 2 < (int)mainWindow::h && y < simGridY; y++) {
 			/*
 			val = sim::prsrField[x][y];
 			if (val >= 0) {
@@ -165,7 +164,7 @@ void sim::renderPrsrField() {
 			mainWindow::renderPass[(x * 2 + 1) + (y * 2 + 1) * mainWindow::w] = pixelCol;
 		}
 	}
-	for (int tarTrans = 0; tarTrans < sim::transArrLen; tarTrans++) {
+	for (unsigned int tarTrans = 0; tarTrans < sim::transArrLen; tarTrans++) {
 		if (sim::transArr[tarTrans].inv) {
 			pixelCol.r = 250;
 			pixelCol.g = 0;
@@ -177,13 +176,13 @@ void sim::renderPrsrField() {
 			pixelCol.b = 250;
 		}
 		for (int roveSurf = -transRadi; roveSurf < transRadi; roveSurf++) {
-			surfX = cos(sim::transArr[tarTrans].rot) * roveSurf + sim::transArr[tarTrans].posX;
-			surfY = sin(sim::transArr[tarTrans].rot) * roveSurf + sim::transArr[tarTrans].posY;
-			if ((char)surfX * 2 < mainWindow::w && (char)surfY * 2 < mainWindow::h) {
-				mainWindow::renderPass[((char)surfX * 2) + ((char)surfY * 2) * mainWindow::w] = pixelCol;
-				mainWindow::renderPass[((char)surfX * 2 + 1) + ((char)surfY * 2) * mainWindow::w] = pixelCol;
-				mainWindow::renderPass[((char)surfX * 2) + ((char)surfY * 2 + 1) * mainWindow::w] = pixelCol;
-				mainWindow::renderPass[((char)surfX * 2 + 1) + ((char)surfY * 2 + 1) * mainWindow::w] = pixelCol;
+			surfX = (float)(cos(sim::transArr[tarTrans].rot) * roveSurf + sim::transArr[tarTrans].posX);
+			surfY = (float)(sin(sim::transArr[tarTrans].rot) * roveSurf + sim::transArr[tarTrans].posY);
+			if ((unsigned int)surfX * 2 < mainWindow::w && (unsigned int)surfY * 2 < mainWindow::h) {
+				mainWindow::renderPass[((unsigned int)surfX * 2) + ((unsigned int)surfY * 2) * mainWindow::w] = pixelCol;
+				mainWindow::renderPass[((unsigned int)surfX * 2 + 1) + ((unsigned int)surfY * 2) * mainWindow::w] = pixelCol;
+				mainWindow::renderPass[((unsigned int)surfX * 2) + ((unsigned int)surfY * 2 + 1) * mainWindow::w] = pixelCol;
+				mainWindow::renderPass[((unsigned int)surfX * 2 + 1) + ((unsigned int)surfY * 2 + 1) * mainWindow::w] = pixelCol;
 			}
 		}
 	}
@@ -292,7 +291,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 				/////////////////////
 			}
 			if (globals::mainSim.progress) {
-				globals::mainSim.t += dt;
+				globals::mainSim.t += (float)dt;
 				globals::runsim = true;
 			}
 			accum -= dt;
@@ -377,7 +376,7 @@ LRESULT CALLBACK winProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 						globals::quit = true;
 						break;
 					case 'W':
-						globals::mainSim.t += 0.2;
+						globals::mainSim.t += 0.2f;
 						globals::runsim = true;
 						break;
 					case 'R':
